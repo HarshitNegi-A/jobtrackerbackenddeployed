@@ -64,29 +64,37 @@ exports.listReminders = async (req, res) => {
       order: [["remindAt", "ASC"]],
     });
 
-    // 🕒 Convert UTC → IST before sending to frontend
     const remindersWithLocalTime = reminders.map((reminder) => {
       let utc = reminder.remindAt;
-      if (!utc) return { ...reminder.toJSON(), remindAt: null };
+      if (!utc) {
+        return { ...reminder.toJSON(), remindAt: null };
+      }
 
-      // ✅ Handle MySQL DATETIME ("YYYY-MM-DD HH:mm:ss") by converting to ISO
-      if (!utc.includes("T")) utc = utc.replace(" ", "T") + "Z";
+      // ✅ Normalize MySQL datetime format
+      if (typeof utc === "string" && !utc.includes("T")) {
+        utc = utc.replace(" ", "T") + "Z";
+      }
 
-      const parsed = DateTime.fromISO(utc, { zone: "utc" });
-      const localTime = parsed.isValid
-        ? parsed.setZone("Asia/Kolkata").toISO({ suppressMilliseconds: true })
-        : null;
+      let parsed = DateTime.fromISO(utc, { zone: "utc" });
+      if (!parsed.isValid) {
+        console.warn("Invalid remindAt:", utc); // log for debugging
+        return { ...reminder.toJSON(), remindAt: null };
+      }
+
+      const localTime = parsed
+        .setZone("Asia/Kolkata")
+        .toISO({ suppressMilliseconds: true });
 
       return {
         ...reminder.toJSON(),
-        remindAt: localTime, // ✅ valid ISO IST time for frontend
+        remindAt: localTime,
       };
     });
 
     res.json(remindersWithLocalTime);
   } catch (err) {
-    console.error("listReminders:", err);
-    res.status(500).json({ message: "Error listing reminders" });
+    console.error("listReminders error:", err);
+    res.status(500).json({ message: "Error listing reminders", error: err.message });
   }
 };
 
