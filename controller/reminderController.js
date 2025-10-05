@@ -2,6 +2,7 @@ const { DateTime } = require("luxon");
 const Reminder = require("../model/ReminderModel");
 const Application = require("../model/ApplicationModel");
 
+
 // ---------------- CREATE REMINDER ----------------
 exports.createReminder = async (req, res) => {
   try {
@@ -9,9 +10,9 @@ exports.createReminder = async (req, res) => {
     const { applicationId, note, remindAt } = req.body;
 
     if (!applicationId || !remindAt) {
-      return res
-        .status(400)
-        .json({ message: "applicationId and remindAt are required" });
+      return res.status(400).json({
+        message: "applicationId and remindAt are required",
+      });
     }
 
     // Ensure app belongs to current user
@@ -22,31 +23,31 @@ exports.createReminder = async (req, res) => {
       return res.status(404).json({ message: "Application not found" });
     }
 
-    // 🕒 Parse and validate the date
-    const parsed = DateTime.fromISO(remindAt, { zone: "Asia/Kolkata" });
+    // 🕒 Parse and validate — frontend already sends UTC ISO
+    const parsed = DateTime.fromISO(remindAt, { zone: "utc" });
     if (!parsed.isValid) {
       return res.status(400).json({ message: "Invalid remindAt format" });
     }
 
-    // Convert IST → UTC before saving
-    const utcRemindAt = parsed.toUTC().toISO();
+    // Store directly as UTC ISO
+    const utcRemindAt = parsed.toISO();
 
     const reminder = await Reminder.create({
       userId,
       applicationId,
       note,
-      remindAt: utcRemindAt, // ✅ stored as UTC
+      remindAt: utcRemindAt,
       status: "pending",
     });
 
-    // Fetch reminder with application info
     const reminderWithApp = await Reminder.findByPk(reminder.id, {
       include: [{ model: Application, attributes: ["id", "title", "company"] }],
     });
 
-    res
-      .status(201)
-      .json({ message: "Reminder created", reminder: reminderWithApp });
+    res.status(201).json({
+      message: "Reminder created",
+      reminder: reminderWithApp,
+    });
   } catch (err) {
     console.error("createReminder:", err);
     res.status(500).json({ message: "Error creating reminder" });
@@ -64,12 +65,10 @@ exports.listReminders = async (req, res) => {
       order: [["remindAt", "ASC"]],
     });
 
-    // 🕒 Convert UTC → IST before sending to frontend
+    // 🕒 Convert UTC → IST before sending
     const remindersWithLocalTime = reminders.map((reminder) => {
       const utc = reminder.remindAt;
-      if (!utc) {
-        return { ...reminder.toJSON(), remindAt: null };
-      }
+      if (!utc) return { ...reminder.toJSON(), remindAt: null };
 
       const parsed = DateTime.fromISO(utc, { zone: "utc" });
       const localTime = parsed.isValid
@@ -78,7 +77,7 @@ exports.listReminders = async (req, res) => {
 
       return {
         ...reminder.toJSON(),
-        remindAt: localTime, // ✅ returned in IST
+        remindAt: localTime, // ✅ returned as IST
       };
     });
 
@@ -88,6 +87,7 @@ exports.listReminders = async (req, res) => {
     res.status(500).json({ message: "Error listing reminders" });
   }
 };
+
 
 // ---------------- DELETE REMINDER ----------------
 exports.deleteReminder = async (req, res) => {
