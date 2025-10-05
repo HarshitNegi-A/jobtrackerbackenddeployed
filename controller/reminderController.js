@@ -21,7 +21,7 @@ exports.createReminder = async (req, res) => {
     if (!app)
       return res.status(404).json({ message: "Application not found" });
 
-    // 🕒 Convert local (IST) reminder time to UTC before saving
+    // 🕒 Convert remindAt from IST → UTC before saving
     const utcRemindAt = DateTime.fromISO(remindAt, {
       zone: "Asia/Kolkata",
     })
@@ -32,7 +32,7 @@ exports.createReminder = async (req, res) => {
       userId,
       applicationId,
       note,
-      remindAt: utcRemindAt, // ✅ Save UTC version
+      remindAt: utcRemindAt, // ✅ stored in UTC
       status: "pending",
     });
 
@@ -61,7 +61,7 @@ exports.listReminders = async (req, res) => {
       order: [["remindAt", "ASC"]],
     });
 
-    // 🕒 Convert stored UTC times back to IST before sending
+    // 🕒 Convert UTC → IST before sending to frontend
     const remindersWithLocalTime = reminders.map((reminder) => {
       const localTime = DateTime.fromISO(reminder.remindAt, { zone: "utc" })
         .setZone("Asia/Kolkata")
@@ -69,7 +69,7 @@ exports.listReminders = async (req, res) => {
 
       return {
         ...reminder.toJSON(),
-        remindAt: localTime, // ✅ return IST time to frontend
+        remindAt: localTime, // ✅ converted to IST
       };
     });
 
