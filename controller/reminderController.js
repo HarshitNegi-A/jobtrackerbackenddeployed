@@ -54,7 +54,6 @@ exports.createReminder = async (req, res) => {
   }
 };
 
-// ---------------- LIST REMINDERS ----------------
 exports.listReminders = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -65,19 +64,22 @@ exports.listReminders = async (req, res) => {
       order: [["remindAt", "ASC"]],
     });
 
-    // 🕒 Convert UTC → IST before sending
+    // 🕒 Convert UTC → IST before sending to frontend
     const remindersWithLocalTime = reminders.map((reminder) => {
-      const utc = reminder.remindAt;
+      let utc = reminder.remindAt;
       if (!utc) return { ...reminder.toJSON(), remindAt: null };
+
+      // ✅ Handle MySQL DATETIME ("YYYY-MM-DD HH:mm:ss") by converting to ISO
+      if (!utc.includes("T")) utc = utc.replace(" ", "T") + "Z";
 
       const parsed = DateTime.fromISO(utc, { zone: "utc" });
       const localTime = parsed.isValid
-        ? parsed.setZone("Asia/Kolkata").toISO()
+        ? parsed.setZone("Asia/Kolkata").toISO({ suppressMilliseconds: true })
         : null;
 
       return {
         ...reminder.toJSON(),
-        remindAt: localTime, // ✅ returned as IST
+        remindAt: localTime, // ✅ valid ISO IST time for frontend
       };
     });
 
