@@ -54,9 +54,7 @@ exports.createReminder = async (req, res) => {
   }
 };
 
-const { DateTime } = require("luxon");
-const Reminder = require("../model/ReminderModel");
-const Application = require("../model/ApplicationModel");
+
 
 exports.listReminders = async (req, res) => {
   try {
