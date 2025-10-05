@@ -1,20 +1,7 @@
 const Application = require("../model/ApplicationModel");
 const Company = require("../model/CompanyModel");
-const Note = require("../model/NoteModel"); // ✅ import Note model
-const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const Note = require("../model/NoteModel");
 const { Op } = require("sequelize");
-require("dotenv").config();
-
-const BUCKET = process.env.S3_BUCKET;
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
 
 // ---------------- CRUD ----------------
 
@@ -25,7 +12,7 @@ exports.createApplication = async (req, res) => {
 
     const app = await Application.create({
       title,
-      companyId, // ✅ use FK
+      companyId,
       location,
       status,
       appliedAt,
@@ -45,7 +32,7 @@ exports.getApplication = async (req, res) => {
       where: { id: req.params.id, userId: req.user.id },
       include: [
         { model: Company, attributes: ["id", "name"] },
-        { model: Note, attributes: ["id", "content", "createdAt"] }, // ✅ include notes
+        { model: Note, attributes: ["id", "content", "createdAt"] },
       ],
     });
 
@@ -93,7 +80,7 @@ exports.listApplications = async (req, res) => {
           where: Object.keys(companyWhere).length ? companyWhere : undefined,
           required: false,
         },
-        { model: Note, attributes: ["id", "content", "createdAt"] }, // ✅ include notes
+        { model: Note, attributes: ["id", "content", "createdAt"] },
       ],
       order: [["appliedAt", "DESC"]],
     });
@@ -114,12 +101,13 @@ exports.updateApplication = async (req, res) => {
       { where: { id: req.params.id, userId: req.user.id } }
     );
 
-    if (!updated) return res.status(404).json({ message: "Application not found" });
+    if (!updated)
+      return res.status(404).json({ message: "Application not found" });
 
     const app = await Application.findByPk(req.params.id, {
       include: [
         { model: Company, attributes: ["id", "name"] },
-        { model: Note, attributes: ["id", "content", "createdAt"] }, // ✅ include notes
+        { model: Note, attributes: ["id", "content", "createdAt"] },
       ],
     });
 
@@ -135,56 +123,11 @@ exports.deleteApplication = async (req, res) => {
     const deleted = await Application.destroy({
       where: { id: req.params.id, userId: req.user.id },
     });
-    if (!deleted) return res.status(404).json({ message: "Application not found" });
+    if (!deleted)
+      return res.status(404).json({ message: "Application not found" });
     res.json({ message: "Deleted" });
   } catch (err) {
     console.error("deleteApplication:", err);
     res.status(500).json({ message: "Error deleting application" });
-  }
-};
-
-// ---------------- S3 Upload & Download ----------------
-
-exports.getUploadUrl = async (req, res) => {
-  try {
-    const app = await Application.findOne({ where: { id: req.params.id, userId: req.user.id } });
-    if (!app) return res.status(404).json({ message: "Application not found" });
-
-    const fileName = `resume-${Date.now()}.pdf`;
-    const key = `resumes/${req.user.id}/${req.params.id}/${fileName}`;
-
-    const cmd = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      ContentType: "application/pdf",
-      ACL: "private",
-    });
-
-    const url = await getSignedUrl(s3, cmd, { expiresIn: 60 });
-
-    app.resumeKey = key;
-    await app.save();
-
-    res.json({ uploadUrl: url, key });
-  } catch (err) {
-    console.error("getUploadUrl:", err);
-    res.status(500).json({ message: "Error generating upload URL" });
-  }
-};
-
-exports.getResumeDownloadUrl = async (req, res) => {
-  try {
-    const app = await Application.findOne({ where: { id: req.params.id, userId: req.user.id } });
-    if (!app || !app.resumeKey) {
-      return res.status(404).json({ message: "Resume not found" });
-    }
-
-    const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: app.resumeKey });
-    const url = await getSignedUrl(s3, cmd, { expiresIn: 60 * 5 });
-
-    res.json({ downloadUrl: url, key: app.resumeKey });
-  } catch (err) {
-    console.error("getResumeDownloadUrl:", err);
-    res.status(500).json({ message: "Error generating download URL" });
   }
 };

@@ -16,8 +16,6 @@ const Application = sequelize.define("Application", {
     defaultValue: "applied",
   },
   appliedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-  resumeKey: { type: DataTypes.STRING }, // S3 key for resume file
-  resumeUrl: { type: DataTypes.STRING }, // optional public URL or stored info
   notes: { type: DataTypes.TEXT },
   userId: { type: DataTypes.INTEGER, allowNull: false },
 }, {

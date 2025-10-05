@@ -10,7 +10,6 @@ router.get("/applications/:id", auth, controller.getApplication);
 router.put("/applications/:id", auth, controller.updateApplication);
 router.delete("/applications/:id", auth, controller.deleteApplication);
 
-router.get("/applications/:id/resume/upload", auth, controller.getUploadUrl);
-router.get("/applications/:id/resume/download", auth, controller.getResumeDownloadUrl);
+
 
 module.exports = router;
