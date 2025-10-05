@@ -8,7 +8,7 @@ exports.createReminder = async (req, res) => {
   try {
     const userId = req.user.id;
     const { applicationId, note, remindAt } = req.body;
-
+    console.log("Received remindAt from frontend:", remindAt);
     if (!applicationId || !remindAt) {
       return res.status(400).json({
         message: "applicationId and remindAt are required",
