@@ -17,7 +17,7 @@ const noteRoute=require('./routes/noteRoute')
 const Note=require('./model/NoteModel')
 
 app.use(cors({
-  origin: "https://jobapplicationtracker11.netlify.app/",
+  origin: "https://jobapplicationtracker11.netlify.app",
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
