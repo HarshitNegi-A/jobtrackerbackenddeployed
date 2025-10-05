@@ -1,7 +1,8 @@
+const { DateTime } = require("luxon");
 const Reminder = require("../model/ReminderModel");
 const Application = require("../model/ApplicationModel");
 
-// Create a reminder
+// ---------------- CREATE REMINDER ----------------
 exports.createReminder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -14,14 +15,24 @@ exports.createReminder = async (req, res) => {
     }
 
     // Ensure app belongs to current user
-    const app = await Application.findOne({ where: { id: applicationId, userId } });
-    if (!app) return res.status(404).json({ message: "Application not found" });
+    const app = await Application.findOne({
+      where: { id: applicationId, userId },
+    });
+    if (!app)
+      return res.status(404).json({ message: "Application not found" });
+
+    // 🕒 Convert local (IST) reminder time to UTC before saving
+    const utcRemindAt = DateTime.fromISO(remindAt, {
+      zone: "Asia/Kolkata",
+    })
+      .toUTC()
+      .toISO();
 
     const reminder = await Reminder.create({
       userId,
       applicationId,
       note,
-      remindAt,
+      remindAt: utcRemindAt, // ✅ Save UTC version
       status: "pending",
     });
 
@@ -30,35 +41,54 @@ exports.createReminder = async (req, res) => {
       include: [{ model: Application, attributes: ["id", "title", "company"] }],
     });
 
-    res.status(201).json({ message: "Reminder created", reminder: reminderWithApp });
+    res
+      .status(201)
+      .json({ message: "Reminder created", reminder: reminderWithApp });
   } catch (err) {
     console.error("createReminder:", err);
     res.status(500).json({ message: "Error creating reminder" });
   }
 };
 
-// List reminders for current user
+// ---------------- LIST REMINDERS ----------------
 exports.listReminders = async (req, res) => {
   try {
     const userId = req.user.id;
+
     const reminders = await Reminder.findAll({
       where: { userId },
       include: [{ model: Application, attributes: ["id", "title", "company"] }],
       order: [["remindAt", "ASC"]],
     });
-    res.json(reminders);
+
+    // 🕒 Convert stored UTC times back to IST before sending
+    const remindersWithLocalTime = reminders.map((reminder) => {
+      const localTime = DateTime.fromISO(reminder.remindAt, { zone: "utc" })
+        .setZone("Asia/Kolkata")
+        .toISO();
+
+      return {
+        ...reminder.toJSON(),
+        remindAt: localTime, // ✅ return IST time to frontend
+      };
+    });
+
+    res.json(remindersWithLocalTime);
   } catch (err) {
     console.error("listReminders:", err);
     res.status(500).json({ message: "Error listing reminders" });
   }
 };
 
-// Delete reminder
+// ---------------- DELETE REMINDER ----------------
 exports.deleteReminder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const deleted = await Reminder.destroy({ where: { id: req.params.id, userId } });
-    if (!deleted) return res.status(404).json({ message: "Reminder not found" });
+    const deleted = await Reminder.destroy({
+      where: { id: req.params.id, userId },
+    });
+    if (!deleted)
+      return res.status(404).json({ message: "Reminder not found" });
     res.json({ message: "Deleted" });
   } catch (err) {
     console.error("deleteReminder:", err);
@@ -66,7 +96,7 @@ exports.deleteReminder = async (req, res) => {
   }
 };
 
-// Dismiss reminder (mark as dismissed)
+// ---------------- DISMISS REMINDER ----------------
 exports.dismissReminder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -74,7 +104,8 @@ exports.dismissReminder = async (req, res) => {
       { status: "dismissed" },
       { where: { id: req.params.id, userId } }
     );
-    if (!updated) return res.status(404).json({ message: "Reminder not found" });
+    if (!updated)
+      return res.status(404).json({ message: "Reminder not found" });
     res.json({ message: "Dismissed" });
   } catch (err) {
     console.error("dismissReminder:", err);
