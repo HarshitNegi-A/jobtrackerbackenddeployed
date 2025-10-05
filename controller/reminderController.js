@@ -54,6 +54,10 @@ exports.createReminder = async (req, res) => {
   }
 };
 
+const { DateTime } = require("luxon");
+const Reminder = require("../model/ReminderModel");
+const Application = require("../model/ApplicationModel");
+
 exports.listReminders = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -66,21 +70,30 @@ exports.listReminders = async (req, res) => {
 
     const remindersWithLocalTime = reminders.map((reminder) => {
       let utc = reminder.remindAt;
+
+      // 1️⃣ Handle empty/null values
       if (!utc) {
         return { ...reminder.toJSON(), remindAt: null };
       }
 
-      // ✅ Normalize MySQL datetime format
+      // 2️⃣ Handle Date objects (common in Sequelize)
+      if (utc instanceof Date) {
+        utc = utc.toISOString(); // ✅ safely convert to ISO string
+      }
+
+      // 3️⃣ Normalize MySQL DATETIME strings (e.g. "2025-10-05 23:22:00")
       if (typeof utc === "string" && !utc.includes("T")) {
         utc = utc.replace(" ", "T") + "Z";
       }
 
-      let parsed = DateTime.fromISO(utc, { zone: "utc" });
+      // 4️⃣ Parse the UTC date
+      const parsed = DateTime.fromISO(utc, { zone: "utc" });
       if (!parsed.isValid) {
-        console.warn("Invalid remindAt:", utc); // log for debugging
+        console.warn("⚠️ Invalid remindAt:", utc);
         return { ...reminder.toJSON(), remindAt: null };
       }
 
+      // 5️⃣ Convert UTC → IST and format nicely
       const localTime = parsed
         .setZone("Asia/Kolkata")
         .toISO({ suppressMilliseconds: true });
@@ -94,9 +107,13 @@ exports.listReminders = async (req, res) => {
     res.json(remindersWithLocalTime);
   } catch (err) {
     console.error("listReminders error:", err);
-    res.status(500).json({ message: "Error listing reminders", error: err.message });
+    res.status(500).json({
+      message: "Error listing reminders",
+      error: err.message,
+    });
   }
 };
+
 
 
 // ---------------- DELETE REMINDER ----------------
